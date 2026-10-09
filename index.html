@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram 粉絲與追蹤狀態比對工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white py-6 shadow-md">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <h1 class="text-3xl font-bold tracking-tight">IG 誰沒回追我？查詢工具</h1>
+            <p class="text-sm text-purple-100 mt-2">安全、快速、100% 在本機瀏覽器解析，隱私零風險</p>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <!-- 步驟教學 -->
+        <section class="bg-white rounded-2xl p-6 shadow-sm mb-8 border border-slate-100">
+            <h2 class="text-lg font-bold text-slate-800 mb-3 flex items-center">
+                <span class="bg-purple-100 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">?</span>
+                使用步驟教學
+            </h2>
+            <ol class="list-decimal list-inside space-y-2 text-sm text-slate-600 leading-relaxed">
+                <li>打開 IG → 設定 → 帳號中心 → 你的資訊和下載內容。</li>
+                <li>選擇「下載或移轉資訊」→ 僅勾選「粉絲和追蹤中」。</li>
+                <li>格式務必選擇 <strong class="text-purple-600">JSON</strong>，下載成功後會取得 <code class="bg-slate-100 px-1 py-0.5 rounded">.zip</code> 壓縮檔。</li>
+                <li>將下載好的 <strong class="text-purple-600">.zip 檔</strong> 或解壓後的 <code class="bg-slate-100 px-1 py-0.5 rounded">followers_1.json</code> 與 <code class="bg-slate-100 px-1 py-0.5 rounded">following.json</code> 直接拖曳或上傳至下方區塊。</li>
+            </ol>
+        </section>
+
+        <!-- 上傳區塊 -->
+        <section class="mb-8">
+            <div id="drop-zone" class="border-2 border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/50 hover:bg-purple-50 transition-all rounded-2xl p-8 text-center cursor-pointer">
+                <input type="file" id="file-input" multiple accept=".zip,.json" class="hidden">
+                <div class="flex flex-col items-center justify-center space-y-3">
+                    <svg class="w-12 h-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-base font-semibold text-slate-700">點擊上傳或拖曳檔案至此區域</p>
+                    <p class="text-xs text-slate-500">支援 IG 導出的 <span class="text-purple-600 font-medium">.zip 檔</span>，或 <span class="text-purple-600 font-medium">followers_1.json</span> / <span class="text-purple-600 font-medium">following.json</span></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 結果統計卡片 -->
+        <section id="result-section" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm text-center">
+                    <span class="text-xs text-slate-400 font-medium block mb-1">正在追蹤中 (Following)</span>
+                    <span id="stat-following" class="text-2xl font-bold text-slate-700">0</span>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm text-center">
+                    <span class="text-xs text-slate-400 font-medium block mb-1">粉絲人數 (Followers)</span>
+                    <span id="stat-followers" class="text-2xl font-bold text-slate-700">0</span>
+                </div>
+                <div class="bg-red-50 p-5 rounded-xl border border-red-100 shadow-sm text-center">
+                    <span class="text-xs text-red-400 font-medium block mb-1">沒回追你的人 (Not Following Back)</span>
+                    <span id="stat-not-back" class="text-2xl font-bold text-red-600">0</span>
+                </div>
+            </div>
+
+            <!-- 沒回追清單與搜尋 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h3 class="font-bold text-slate-800">未回追帳號清單</h3>
+                    <input type="text" id="search-input" placeholder="搜尋帳號..." class="w-full sm:w-64 px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+                <ul id="not-following-list" class="divide-y divide-slate-100 max-h-96 overflow-y-auto p-2">
+                    <!-- 動態渲染清單 -->
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const resultSection = document.getElementById('result-section');
+        const searchInput = document.getElementById('search-input');
+
+        let followingSet = new Set();
+        let followersSet = new Set();
+        let notFollowingBackArray = [];
+
+        // 觸發選擇檔案
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // 拖曳事件處理
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('border-purple-600', 'bg-purple-100/50'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-purple-600', 'bg-purple-100/50'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            handleFiles(dt.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        // 解析主流程
+        async function handleFiles(files) {
+            followingSet.clear();
+            followersSet.clear();
+
+            for (let file of files) {
+                if (file.name.endsWith('.zip')) {
+                    await processZip(file);
+                } else if (file.name.endsWith('.json')) {
+                    await processJsonFile(file);
+                }
+            }
+
+            calculateAndRender();
+        }
+
+        // 處理 ZIP 檔案
+        async function processZip(zipFile) {
+            const zip = await JSZip.loadAsync(zipFile);
+            for (let relativePath in zip.files) {
+                const file = zip.files[relativePath];
+                if (file.dir) continue;
+
+                if (relativePath.includes('following.json')) {
+                    const content = await file.async('string');
+                    parseFollowingJson(JSON.parse(content));
+                } else if (relativePath.includes('followers_1.json') || relativePath.includes('followers.json')) {
+                    const content = await file.async('string');
+                    parseFollowersJson(JSON.parse(content));
+                }
+            }
+        }
+
+        // 處理單獨上傳的 JSON 檔案
+        async function processJsonFile(file) {
+            const content = await file.text();
+            const json = JSON.parse(content);
+            if (file.name.includes('following')) {
+                parseFollowingJson(json);
+            } else if (file.name.includes('followers')) {
+                parseFollowersJson(json);
+            }
+        }
+
+        // 解析 IG following.json 格式
+        function parseFollowingJson(data) {
+            const items = data.relationships_following || data;
+            if (Array.isArray(items)) {
+                items.forEach(item => {
+                    if (item.string_list_data && item.string_list_data[0]) {
+                        followingSet.add(item.string_list_data[0].value);
+                    } else if (item.title) {
+                        followingSet.add(item.title);
+                    }
+                });
+            }
+        }
+
+        // 解析 IG followers_1.json 格式
+        function parseFollowersJson(data) {
+            const items = Array.isArray(data) ? data : (data.relationships_followers || []);
+            items.forEach(item => {
+                if (item.string_list_data && item.string_list_data[0]) {
+                    followersSet.add(item.string_list_data[0].value);
+                } else if (item.title) {
+                    followersSet.add(item.title);
+                }
+            });
+        }
+
+        // 計算差集並渲染 UI
+        function calculateAndRender() {
+            if (followingSet.size === 0 && followersSet.size === 0) {
+                alert('未找到有效的 following.json 或 followers_1.json，請確認上傳的檔案格式是否正確。');
+                return;
+            }
+
+            // 集合差集演算：following - followers
+            notFollowingBackArray = Array.from(followingSet).filter(user => !followersSet.has(user));
+
+            document.getElementById('stat-following').innerText = followingSet.size;
+            document.getElementById('stat-followers').innerText = followersSet.size;
+            document.getElementById('stat-not-back').innerText = notFollowingBackArray.length;
+
+            resultSection.classList.remove('hidden');
+            renderList(notFollowingBackArray);
+        }
+
+        // 渲染未回追名單
+        function renderList(list) {
+            const ul = document.getElementById('not-following-list');
+            ul.innerHTML = '';
+
+            if (list.length === 0) {
+                ul.innerHTML = '<li class="p-4 text-center text-slate-400 text-sm">所有人都有回追你，太棒了！</li>';
+                return;
+            }
+
+            list.forEach(username => {
+                const li = document.createElement('li');
+                li.className = 'p-3 flex justify-between items-center hover:bg-slate-50 transition-colors rounded-lg';
+                li.innerHTML = `
+                    <span class="font-medium text-slate-700">@${username}</span>
+                    <a href="https://instagram.com/${username}" target="_blank" rel="noopener noreferrer" class="px-3 py-1 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium rounded-md transition-colors">
+                        查看 IG
+                    </a>
+                `;
+                ul.appendChild(li);
+            });
+        }
+
+        // 搜尋過濾功能
+        searchInput.addEventListener('input', (e) => {
+            const keyword = e.target.value.toLowerCase();
+            const filtered = notFollowingBackArray.filter(username => username.toLowerCase().includes(keyword));
+            renderList(filtered);
+        });
+    </script>
+</body>
+</html>
